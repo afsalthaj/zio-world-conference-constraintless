@@ -1,0 +1,291 @@
+footer: © zioworld
+slidenumbers: true
+
+# Constraintless
+
+---
+
+## Famous Example
+
+```scala
+
+sealed trait Expr[A]
+
+object Expr {
+  case class IntExpr(expr: Int) extends Expr[Int]
+  case class DoubleExpr(expr: Double) extends Expr[Double]
+  case class Sum[A](left: Expr[A], right: Expr[A]) extends Expr[A]
+  case class Zip[A, B](left: Expr[A], right: Expr[B]) extends Expr[(A, B)]
+}
+
+```
+---
+## Expr Usage
+
+```scala
+  val myExpr =
+    Sum(IntExpr(1), IntExpr(2))
+
+  val complexExpr =
+    Sum(
+      Zip(myExpr, myExpr), 
+      Zip(IntExpr(3), IntExpr(4))
+    )
+```
+
+---
+
+## Compile
+
+```scala
+  def compile[A](expr: Expr[A]): A =
+    expr match {
+      case Expr.IntExpr(expr)    => expr
+      case Expr.DoubleExpr(expr) => expr
+      case Expr.Sum(left, right) => compile(left) + ??? // hmm, is compile(left) a tuple or ???
+      case Expr.Zip(left, right) => compile(left) + ??? // hmm,  compile(left) a tuple or ???
+    }
+```
+
+---
+
+## Compile
+
+The core of the problem is we are dealing with unknown types.
+
+May be we can solve through typeclass
+
+---
+## Num typeclass
+
+```scala
+trait Num[A] {
+  def add(l: A, r: A): A
+}
+
+object Num {
+  implicit def addInt: Num[Int] = ???
+  implicit def addDouble: Num[Double] =  ???
+  implicit def addTuple[A, B](implicit ev: Num[A], ev2: Num[B]) = ???
+}
+
+```
+
+---
+
+## Typeclass
+
+```scala
+
+
+ // Conceptually wrong
+ def compile[A](expr: Expr[A])(implicit ev: Num[A]): A = 
+    expr match {
+      case Expr.IntExpr(expr) => expr
+      case Expr.DoubleExpr(expr) => expr
+      case Expr.Sum(left, right) => ev.add(compile(left)(ev), compile(right)(ev))
+      case zip: Expr.Zip[a, b] => (compile(zip.left)(ev), compile(zip.right)(ev)) // Compile Error
+    }
+
+ compile(complexExpr)
+
+```
+
+
+---
+ 
+## How about constraints at the point of definition ?
+ 
+
+---
+
+## Example
+
+```scala
+
+sealed trait Expr[A]
+
+object Expr {
+  case class IntExpr(expr: Int) extends Expr[Int]
+  case class DoubleExpr(expr: Double) extends Expr[Double]
+  case class Sum[A](left: Expr[A], right: Expr[A])(implicit val ev1: Num[A]) extends Expr[A]
+  case class Zip[A, B](left: Expr[A], right: Expr[B])(implicit val ev1: Num[A], ev2: Num[B]) extends Expr[(A, B)]
+}
+
+```
+
+---
+
+## And that compiles
+
+```scala
+
+  def compile[A](expr: Expr[A]): A =
+    expr match {
+      case Expr.IntExpr(expr) => expr
+      case Expr.DoubleExpr(expr) => expr
+      case sum @ Expr.Sum(left, right) => sum.ev1.add(compile(left), compile(right))
+      case zip: Expr.Zip[a, b] => (compile(zip.left), compile(zip.right))
+    }
+
+```
+
+---
+
+## But ?
+
+The language knows the executor details.
+Num was really an executor detail
+
+---
+
+## In other words
+
+
+It should depend on the type of executor, whether 
+Whether or not we need an instance of a typeclass
+
+---
+
+## Example
+
+We never use the `Num` typeclass
+
+```scala
+def compile[A](expr: Expr[A]): String =
+  expr match {
+    case Expr.IntExpr(expr) => s"${expr}"
+    case Expr.DoubleExpr(expr) => s"${expr}"
+    case Expr.Sum(left, right) => s"${compile(left)} + ${compile(right)}"
+    case zip: Expr.Zip[a, b] => s"(${compile(zip.left)}, ${compile(zip.right)})"
+}
+
+```
+---
+
+
+> _The key principle that underpins our idea is that implementation- specific constraints should be imposed at the point of use of a data type, not at the point of definition, i.e. it embodies the established principle that an interface should be separated from its implementation(s)._
+
+ -- http://www.doc.ic.ac.uk/~wlj05/files/Deconstraining.pdf
+
+---
+
+## On Demand Metrics Computation Computation Application
+
+---
+## Role of Execution Plan
+
+An execution plan is mainly for developer debugging purposes,  Th
+
+* How many data sources are going to be involved in the computation? 
+* Will you use cache? 
+* Give me the fallback logic and the number of retries.
+
+
+
+---
+
+# Query
+
+
+```scala
+
+sealed trait Query[A]
+
+case class ReadCache[A](key: String) extends Query[A]
+case class ReadDatabase[A](sql: SqlQuery) extends Query[A]
+case class ReadAPI[A](apiRequest: ApiRequest) extends Query[A]
+
+```
+
+
+---
+
+# Execution Plan
+
+
+```scala
+sealed trait Ops[A]
+
+case class Pure(query: A) extends Ops[A]
+case class Add(left: A, right: A) extends Ops[A]
+case class Divide(left: A, right: Double) extends Ops[A]
+case class Ratio(left: A, right: A) extends Ops[A]
+case class Union(opss: NonEmptyChunk[A]) extends Ops[A]
+case class Aggregate(opss: NonEmptyChunk[A]) extends Ops[A]
+
+```
+
+---
+
+# Execution Plan of Queries
+
+
+```scala
+type ExecutionPlan[A] = Ops[Query[A]] // and not Ops[Query[Double]]
+
+```
+
+---
+
+# Footnotes
+
+Footnote references need to be *unique in the markdown file*. This means, that you can also reference footnotes from any slide, no matter where they are defined.
+
+When there are multiple references are listed, they must all be separated by blanks lines.
+
+---
+
+
+# Nested Lists
+
+- You can create nested lists
+    1. by indenting
+    1. each item with
+    1. 4 spaces
+- It’s that simple
+
+---
+
+# Links
+
+Create links to any external resource—like [a website](http://www.deckset.com)—by wrapping link text in square brackets, followed immediately by a set of regular parentheses containing the URL where you want the link to point:
+
+`‘[a website](http://www.deckset.com)’`
+
+Your links will be clickable in exported PDFs as well!
+
+---
+
+# Display formulas
+
+Easily include mathematical formulas by enclosing TeX commands in `$$` delimiters. Deckset uses [MathJax](http://www.mathjax.org/) to translate TeX commands into beautiful vector graphics.
+
+<a name="formulas"></a>
+
+---
+
+## Schrödinger equation
+
+The simplest way to write the time-independent Schrödinger equation is $$H\psi = E\psi$$, however, with the Hamiltonian operator expanded it becomes:
+
+$$
+-\frac{\hbar^2}{2m} \frac{d^2 \psi}{dx^2} + V\psi = E\psi
+$$
+
+---
+
+# Captioned Images and Videos
+
+![inline](room.jpg)
+
+Easily create captions using [inline] images/videos with text underneath.
+
+---
+
+# Plus:
+
+- PDF export for printed handouts
+- Speaker notes and rehearsal mode
+- Switch theme and ratio on the fly
+- Animated GIFs for cheap wins and LOLs :-)
