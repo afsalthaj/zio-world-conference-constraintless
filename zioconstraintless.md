@@ -9,13 +9,11 @@ slidenumbers: true
 
 ```scala
 
-sealed trait Expr[A]
-
-object Expr {
-  case class IntExpr(expr: Int) extends Expr[Int]
-  case class DoubleExpr(expr: Double) extends Expr[Double]
-  case class Sum[A](left: Expr[A], right: Expr[A]) extends Expr[A]
-  case class Zip[A, B](left: Expr[A], right: Expr[B]) extends Expr[(A, B)]
+enum Expr[A] {
+  case IntExpr(expr: Int) extends Expr[Int]
+  case DoubleExpr(expr: Double) extends Expr[Double]
+  case Sum[A](left: Expr[A], right: Expr[A]) extends Expr[A]
+  case Zip[A, B](left: Expr[A], right: Expr[B]) extends Expr[(A, B)]
 }
 
 ```
@@ -43,7 +41,7 @@ object Expr {
       case Expr.IntExpr(expr)    => expr
       case Expr.DoubleExpr(expr) => expr
       case Expr.Sum(left, right) => compile(left) + ??? // hmm, is compile(left) a tuple or ???
-      case Expr.Zip(left, right) => compile(left) + ??? // hmm,  compile(left) a tuple or ???
+      case Expr.Zip(left, right) => (compile(left), compile(right))
     }
 ```
 
@@ -59,15 +57,15 @@ May be we can solve through typeclass
 ## Num typeclass
 
 ```scala
-trait Num[A] {
-  def add(l: A, r: A): A
-}
+  trait Num[A] {
+    def add(l: A, r: A): A
+  }
 
-object Num {
-  implicit def addInt: Num[Int] = ???
-  implicit def addDouble: Num[Double] =  ???
-  implicit def addTuple[A, B](implicit ev: Num[A], ev2: Num[B]) = ???
-}
+  object Num {
+    given Num[Int] = (l: Int, r: Int) => l + r
+    given Num[Double] = (l: Double, r: Double) => l + r
+    given numTuple[A, B](using ev1: Num[A], ev2: Num[B]): Num[(A, B)] = ...
+  }
 
 ```
 
@@ -373,8 +371,8 @@ def sum[A](
   )(implicit instances: Instances[Num, As]): A =
     expr match {
       case sum @ Expr.Sum(left, right) =>
-        def add[B](a: B, b: B)(use: Num[B]): B =
-          use.add(a, b)
+        def add[B](a: B, b: B): Num[B] => B =
+          _.add(a, b)
 
         instances.withInstance(
           add(compile(left), compile(right))
@@ -389,17 +387,15 @@ def sum[A](
 # More practical example
 
 ```scala
-sealed trait Query[A] {
-  def map[B](f: A => B): Query[B] = ???
 
-}
+  enum Query[A] {
+    case ReadDb[A]() extends Query[A]
+    case ReadCache[A]() extends Query[A]
+    case ReadAPI[A]() extends Query[A]
+    case Map[A, B](query: Query[B], f: A => B)(using val num: Num[A]) extends Query[B]
+    case FlatMap[A, B](query: Query[B], f: A => Query[B]) extends Query[B]
+  }
 
-case class ReadDb[A]() extends Query[A]
-case class ReadCache[A]() extends Query[A]
-case class ReadAPI[A]() extends Query[A]
-case class Map[A](query: Query[A], f: A => B)(evidences) extends Query[B]
-// Constraintful FlatMap
-case class FlatMap[A](query: Query[A], f: A => Query[B])(evidences) extends Query[B]
 
 ```
 
