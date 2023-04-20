@@ -262,8 +262,121 @@ sealed trait Expr[As <: TypeList, A]
 ```
 
 
+---
+## Terms
+
+```scala
+
+  case class Zip[As <: TypeList, A, B](
+   left: Expr[As, A], 
+   right: Expr[As, B]
+  )(implicit val ev: A IsElementOf As, ev2: B IsElementOf As) extends Expr[As, (A, B)]
+
+```
 
 ---
+## My allowed types
+
+```scala
+  type AllowedTypes = Int :: Double :: (Int, Int) :: (Int, Double) :: End
+```
+
+
+---
+## My allowed types
+
+```scala
+  type AllowedTypes = Int :: Double :: (Int, Int) :: (Int, Double) :: End
+```
+
+--- 
+## My Allowed types (Note)
+
+```scala
+// In scala3, it gets even better
+
+type Prim = Int | Double
+type AllowedTypes = Prim :: (Prim, Prim) :: (Prim, Prim, Prim) :: End
+
+// Replacing IntExpr & DoubleExpr with
+final case class Primitive[As <: TypeList, A <: Prim](
+  expr: A
+)(implicit val ev: Prim IsElementOf As) extends Expr[As, Prim]
+
+
+```
+
+---
+
+## My Allowed types (Note)
+
+```scala
+
+// Infact this is possible too
+type AllowedTypes[A] = A :: (A, A) :: (A, A, A) :: End
+
+
+
+```
+---
+
+## Helpers
+
+
+```scala
+def sum[A](
+  a: Expr[AllowedTypes, A], 
+  b: Expr[AllowedTypes, A]
+)(implicit ev: A IsElementOf AllowedTypes) =
+  Sum(a, b)
+
+
+```
+
+---
+
+## Helpers
+
+
+```scala
+
+  def zip[A, B](
+   a: Expr[AllowedTypes, A], 
+   b: Expr[AllowedTypes, B]
+  )(implicit ev: A IsElementOf AllowedTypes, ev2: B IsElementOf AllowedTypes) =
+    Zip(a, b)
+
+```
+
+---
+
+## Original program
+
+```scala
+
+  val myExpr =
+    sum(IntExpr(1), IntExpr(2))
+
+  val complexExpr =
+    sum(zip(myExpr, myExpr), zip(IntExpr(3), IntExpr(4)))
+```
+
+---
+
+## Compiler
+
+
+```scala
+
+
+
+
+```
+
+---
+
+---
+
 ## On Demand Metrics Computation Computation Application
 
 ---
@@ -278,6 +391,8 @@ An execution plan is mainly for developer debugging purposes,  Th
 
 
 ---
+
+
 
 # Query
 
