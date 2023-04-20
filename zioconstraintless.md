@@ -1,5 +1,4 @@
-footer: @afsal
-slidenumbers: false
+footer: @zioworld
 
 # Constraintless
 
@@ -38,10 +37,10 @@ enum Expr[A] {
 ```scala
   def compile[A](expr: Expr[A]): A =
     expr match {
-      case Expr.IntExpr(expr)    => expr
-      case Expr.DoubleExpr(expr) => expr
-      case Expr.Sum(left, right) => compile(left) + ??? // hmm, is compile(left) a tuple or ???
-      case Expr.Zip(left, right) => (compile(left), compile(right))
+      case Expr.IntExpr(int)       => int
+      case Expr.DoubleExpr(double) => double
+      case Expr.Sum(left, right)   => compile(left) + ??? // hmm, is compile(left) a tuple or ???
+      case Expr.Zip(left, right)   => (compile(left), compile(right))
     }
 ```
 
@@ -76,16 +75,19 @@ May be we can solve through typeclass
 ```scala
 
 
- // Conceptually wrong
+ // Conceptually wrong but it complies and works for many cases :)
  def compile[A](expr: Expr[A])(implicit ev: Num[A]): A = 
     expr match {
       case Expr.IntExpr(expr) => expr
       case Expr.DoubleExpr(expr) => expr
       case Expr.Sum(left, right) => ev.add(compile(left)(ev), compile(right)(ev))
-      case zip: Expr.Zip[a, b] => (compile(zip.left)(ev), compile(zip.right)(ev)) // Compile Error
+      case zip: Expr.Zip[a, b] => 
+       val ev_ = ev.asInstanceOf[Num[A]]
+      (compile(zip.left)(ev_), compile(zip.right)(ev_))
     }
 
- compile(complexExpr)
+ compile(sum(zip(int(1), int(2)), zip(int(2), int(3))) // works
+ compile(zip(sum(int(1), int(2)), sum(int(2), int(3))) // runtime exception
 
 ```
 
@@ -216,25 +218,11 @@ This implies, we need to have an idea of all possible types that the program gen
 
 
 ---
-
-## Summary of Constraintless
-
-```scala
-
-The TypeClass (Example: Num)
-As <: TypeList (List of all types)
-Instances[TypeClass, As] (auto resolved by library)
-IsElementOf[A, As]       (auto resolved by library)
-
-
-```
-
----
 ## Redefine our Expr
 
 ```scala
 
-sealed trait Expr[As <: TypeList, A]
+enum Expr[As <: TypeList, A]
 
 
 ```
@@ -263,17 +251,11 @@ sealed trait Expr[As <: TypeList, A]
 
 
 ---
+
 ## My allowed types
 
 ```scala
-  type AllowedTypes = Int :: Double :: (Int, Int) :: (Int, Double) :: End
-```
-
-
----
-## My allowed types
-
-```scala
+ // Later
   type AllowedTypes = Int :: Double :: (Int, Int) :: (Int, Double) :: End
 ```
 
@@ -378,16 +360,14 @@ def sum[A](
 ```scala
 
   enum Query[A] {
-    case ReadDb[A]() extends Query[A]
-    case ReadCache[A]() extends Query[A]
-    case ReadAPI[A]() extends Query[A]
-    case Map[A, B](query: Query[B], f: A => B)(using val num: Num[A]) extends Query[B]
-    case FlatMap[A, B](query: Query[B], f: A => Query[B]) extends Query[B]
+    case ReadDb[A](input: String) extends Query[A]
+    case ReadCache[A](input: String) extends Query[A]
+    case ReadAPI[A](input: String) extends Query[A]
+    case Map[A, B](query: Query[A], f: A => B) extends Query[B]
+    case FlatMap[A, B](query: Query[A], f: A => Query[B]) extends Query[B]
   }
 
-
 ```
-
 ---
 
 ## Compiling the query
@@ -395,27 +375,37 @@ def sum[A](
 ```scala
 
 def compiler[As <: TypeList](query: Query[A])(implicit 
-  ev1: Instances[SqlDecoder, As], 
-  ev2: Instances[JsonDecoder, As]
+  sqlDec: Instances[SqlDecoder, As], 
+  jsonDec: Instances[JsonDecoder, As]
 ): Task[A] = {
-  case db @ ReadDb() => ev1.withInstance(...)(db.elem)
-  case api @ ReadAPI() => ev2.withInstance(...)(api.elem)
+  case db @ ReadDb(str)     => sqlDec.withInstance(...)(db.elem)
+  case api @ ReadAPI(str)   => jsonDec.withInstance(...)(api.elem)
+  case FlatMap(query, f) => loop(query).flatMap(a => loop(f(a)))
+  case Map(query, f)     => loop(query).map(f)
 }
 ```
+
 ---
+## Summary
+
+* We have a Program that's independent of type classes
+* Program talks about `As <: TypeList` 
+* Every possible types within the program should be an element of `As`
+* At the compiler, we can look up the typeclass for each type from `Instances[TypeClass, As]`.
+
+---
+
 
 ## When to use / examples
 
 * Applicable for advanced libraries that rely on initial encoding.
   Currently used in ```zio-schema```
-* Application codebase that deals with like execution plan and multiple datasources, and its read/write.
-* Multi compiler languages, with complex logic to comprehend about types manually
+* Application codebase that deals with things like execution plan and multiple datasources, and its read/write.
 
 ---
 
 ## THANKS! 
 
-@afsalt2 (twitter)
-Afsal Thaj (Discord)
+https://twitter.com/afsalt2
 
 ---
