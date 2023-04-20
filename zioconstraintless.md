@@ -258,7 +258,7 @@ sealed trait Expr[As <: TypeList, A]
   case class Sum[As <: TypeList, A](
    left: Expr[As, A], 
    right: Expr[As, A]
-  )(implicit val ev: A IsElementOf As) extends Expr[As, A]
+  )(implicit val elem: A IsElementOf As) extends Expr[As, A]
 ```
 
 
@@ -327,7 +327,7 @@ type AllowedTypes[A] = A :: (A, A) :: (A, A, A) :: End
 def sum[A](
   a: Expr[AllowedTypes, A], 
   b: Expr[AllowedTypes, A]
-)(implicit ev: A IsElementOf AllowedTypes) =
+)(implicit elem: A IsElementOf AllowedTypes) =
   Sum(a, b)
 
 
@@ -368,125 +368,57 @@ def sum[A](
 
 ```scala
 
+  def compile[As <: TypeList, A](
+   expr: Expr[As, A]
+  )(implicit instances: Instances[Num, As]): A =
+    expr match {
+      case sum @ Expr.Sum(left, right) =>
+        def add[B](a: B, b: B)(use: Num[B]): B =
+          use.add(a, b)
 
+        instances.withInstance(
+          add(compile(left), compile(right))
+        )(sum.elem)
+    }
 
 
 ```
 
 ---
 
+# More practical example
+
+```scala
+sealed trait Query[A] {
+  def map[B](f: A => B): Query[B] = ???
+
+}
+
+case class ReadDb[A]() extends Query[A]
+case class ReadCache[A]() extends Query[A]
+case class ReadAPI[A]() extends Query[A]
+case class Map[A](query: Query[A], f: A => B)(evidences) extends Query[B]
+// Constraintful FlatMap
+case class FlatMap[A](query: Query[A], f: A => Query[B])(evidences) extends Query[B]
+
+```
+
 ---
 
-## On Demand Metrics Computation Computation Application
-
----
-## Role of Execution Plan
-
-An execution plan is mainly for developer debugging purposes,  Th
-
-* How many data sources are going to be involved in the computation? 
-* Will you use cache? 
-* Give me the fallback logic and the number of retries.
-
-
-
----
-
-
-
-# Query
-
+## Compiling the query
 
 ```scala
 
-sealed trait Query[A]
-
-case class ReadCache[A](key: String) extends Query[A]
-case class ReadDatabase[A](sql: SqlQuery) extends Query[A]
-case class ReadAPI[A](apiRequest: ApiRequest) extends Query[A]
-
+def compiler[As <: TypeList](query: Query[A])(implicit 
+  ev1: Instances[SqlDecoder, As], 
+  ev2: Instances[JsonDecoder, As]
+): Task[A] = {
+  case db @ ReadDb() => ev1.withInstance(...)(db.elem)
+  case api @ ReadAPI() => ev2.withInstance(...)(api.elem)
+}
 ```
-
-
 ---
 
-# Execution Plan
-
-
-```scala
-sealed trait Ops[A]
-
-case class Pure(query: A) extends Ops[A]
-case class Add(left: A, right: A) extends Ops[A]
-case class Divide(left: A, right: Double) extends Ops[A]
-case class Ratio(left: A, right: A) extends Ops[A]
-case class Union(opss: NonEmptyChunk[A]) extends Ops[A]
-case class Aggregate(opss: NonEmptyChunk[A]) extends Ops[A]
-
-```
-
----
-
-# Execution Plan of Queries
-
-
-```scala
-type ExecutionPlan[A] = Ops[Query[A]] // and not Ops[Query[Double]]
-
-```
-
----
-
-# Footnotes
-
-Footnote references need to be *unique in the markdown file*. This means, that you can also reference footnotes from any slide, no matter where they are defined.
-
-When there are multiple references are listed, they must all be separated by blanks lines.
-
----
-
-
-# Nested Lists
-
-- You can create nested lists
-    1. by indenting
-    1. each item with
-    1. 4 spaces
-- It’s that simple
-
----
-
-# Links
-
-Create links to any external resource—like [a website](http://www.deckset.com)—by wrapping link text in square brackets, followed immediately by a set of regular parentheses containing the URL where you want the link to point:
-
-`‘[a website](http://www.deckset.com)’`
-
-Your links will be clickable in exported PDFs as well!
-
----
-
-# Display formulas
-
-Easily include mathematical formulas by enclosing TeX commands in `$$` delimiters. Deckset uses [MathJax](http://www.mathjax.org/) to translate TeX commands into beautiful vector graphics.
-
-<a name="formulas"></a>
-
----
-
-## Schrödinger equation
-
-The simplest way to write the time-independent Schrödinger equation is $$H\psi = E\psi$$, however, with the Hamiltonian operator expanded it becomes:
-
-$$
--\frac{\hbar^2}{2m} \frac{d^2 \psi}{dx^2} + V\psi = E\psi
-$$
-
----
-
-# Captioned Images and Videos
-
-![inline](room.jpg)
 
 Easily create captions using [inline] images/videos with text underneath.
 
