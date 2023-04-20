@@ -287,35 +287,6 @@ type AllowedTypes[A] = A :: (A, A) :: (A, A, A) :: End
 
 
 ```
----
-
-## Helpers
-
-
-```scala
-def sum[A](
-  a: Expr[AllowedTypes, A], 
-  b: Expr[AllowedTypes, A]
-)(implicit elem: A IsElementOf AllowedTypes) =
-  Sum(a, b)
-
-
-```
-
----
-
-## Helpers
-
-
-```scala
-
-  def zip[A, B](
-   a: Expr[AllowedTypes, A], 
-   b: Expr[AllowedTypes, B]
-  )(implicit ev: A IsElementOf AllowedTypes, ev2: B IsElementOf AllowedTypes) =
-    Zip(a, b)
-
-```
 
 ---
 
@@ -396,11 +367,19 @@ def compiler[As <: TypeList](query: Query[A])(implicit
 ---
 
 
-## When to use / examples
+## When to use - Examples
 
 * Applicable for advanced libraries that rely on initial encoding.
   Currently used in ```zio-schema```
-* Application codebase that deals with things like execution plan and multiple datasources, and its read/write.
+* Highly observable application codebase that deals with execution plans
+
+---
+
+## Why to invest ?
+
+* Allows you to write flexible, observable and optimisable DSLs
+* Followed by a highly typesafe executor
+* And bringing complete orthogonality into the codebase with implementations details as typeclass instances
 
 ---
 
