@@ -101,13 +101,11 @@ May be we can solve through typeclass
 
 ```scala
 
-sealed trait Expr[A]
-
-object Expr {
-  case class IntExpr(expr: Int) extends Expr[Int]
-  case class DoubleExpr(expr: Double) extends Expr[Double]
-  case class Sum[A](left: Expr[A], right: Expr[A])(implicit val ev1: Num[A]) extends Expr[A]
-  case class Zip[A, B](left: Expr[A], right: Expr[B])(implicit val ev1: Num[A], ev2: Num[B]) extends Expr[(A, B)]
+enum Expr[A] {
+  case IntExpr(expr: Int) extends Expr[Int]
+  case DoubleExpr(expr: Double) extends Expr[Double]
+  case Sum[A](left: Expr[A], right: Expr[A])(using val ev1: Num[A]) extends Expr[A]
+  case Zip[A, B](left: Expr[A], right: Expr[B]) extends Expr[(A, B)]
 }
 
 ```
